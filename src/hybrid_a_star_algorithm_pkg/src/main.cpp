@@ -15,9 +15,6 @@ int main(int argc, char **argv)
 {
     // FIXME: have to delete
     // FIXME: have to delete
-    // FIXME: have to delete
-    // FIXME: have to delete
-    // FIXME: have to delete
 //    double wb = 2.75;                       // unit : m     휠베이스
 //    double steer_angle_tmp = 450;           // unit : deg   스티어링 각도
 //    double d_mv = 5;                        // unit : m     예측할 이동거리

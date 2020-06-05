@@ -170,7 +170,6 @@ public:
         // -> 무시해도 될 듯. 이 부분이 연산량을 늘리는 부분일 듯 함. 중복되는 경우가 있다면, Kinematic Model 계산에 의해 0.00x 이상 차이가 날 것.
 
         // (A)를 OpenNodeList에서 제거
-        // ttttt
         this->node[cur_i].close_flag = true;
 
 

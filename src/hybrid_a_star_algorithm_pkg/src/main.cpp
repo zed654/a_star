@@ -9,6 +9,8 @@
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 
+
+
 int main(int argc, char **argv)
 {
 
@@ -97,7 +99,7 @@ int main(int argc, char **argv)
     int k = 0;
     while (cv::waitKey(10) != 'q')
     {
-        k++;
+        // k++;
         adj_nodes_x.clear();
         adj_nodes_y.clear();
         adj_nodes_x2.clear();

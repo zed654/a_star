@@ -25,6 +25,7 @@ include_directories(
     /usr/local/include
     /usr/include
     src
+    $(CMAKE_CURRENT_SOURCE_DIR)/ThridParty
 )
 
 link_directories(

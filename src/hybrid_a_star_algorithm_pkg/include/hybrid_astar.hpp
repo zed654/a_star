@@ -6,6 +6,9 @@
 #include <cmath>
 #include <unistd.h>
 
+#include <Eigen-3.3/Eigen/Core>
+#include <Eigen-3.3/Eigen/QR>
+
 // FIXME: Set to Visualize
 // FIXME: Set to Visualize
 // FIXME: Set to Visualize
@@ -33,9 +36,9 @@ struct Node
     };
     struct Pos
     {
-        double xn;  // n -> now
+        double xn; // n -> now
         double yn;
-        double xc;  // c -> center
+        double xc; // c -> center
         double yc;
     };
     struct Cost cost;
@@ -86,6 +89,8 @@ public:
     int init_pos_index;
     double threshold_distance_for_stop;
 
+    double length_arc;
+
     double target_x;
     double target_y;
 
@@ -94,7 +99,8 @@ public:
           init_pos_index(0),
           oc_size_row(50000),
           oc_size_col(60000),
-          negative_val_offset(4000)
+          negative_val_offset(4000),
+          length_arc(4.5) //length_arc(1.6)
     {
         // ColxRow 크기의 Occuapcny Grid Map 선언 및 Closed Node 상태를 False로 선언.
         // oc_closed_flag[x][y] 이고, x의 사이즈는 oc_size_row, y의 사이즈는 oc_size_col
@@ -178,28 +184,33 @@ public:
         // (A)위치에서 Kinematic Model 기반의 Neighborhood Nodes를 구하고, node에에 넣음
         std::vector<struct Node> updated_node_tmp = UpdateNode(&this->node[cur_i]); // Set New Node
         node.insert(node.end(), updated_node_tmp.begin(), updated_node_tmp.end());  // 주의 : vector의 insert, push_back 사용 시시 기존 주소가 변함함.
+        // for(int i = 0; i < node.size(); i++)
+        // {
+        //     std::cout << node[i].pos.xn << "\t\t" << node[i].pos.yn << "\t\t"  << node[i].parent_address << std::endl;
+        // }
+        // std::cout << std::endl;
 
         for (int i = 0; i < node.size(); i++)
         {
-            test.data[((int)node[i].pos.xn * 3 + 0) + (3 * (int)node[i].pos.yn * test.cols)] = 0;
-            test.data[((int)node[i].pos.xn * 3 + 1) + (3 * (int)node[i].pos.yn * test.cols)] = 0;
-            test.data[((int)node[i].pos.xn * 3 + 2) + (3 * (int)node[i].pos.yn * test.cols)] = 255;
+            // test.data[((int)node[i].pos.xn * 3 + 0) + (3 * (int)node[i].pos.yn * test.cols)] = 0;
+            // test.data[((int)node[i].pos.xn * 3 + 1) + (3 * (int)node[i].pos.yn * test.cols)] = 0;
+            // test.data[((int)node[i].pos.xn * 3 + 2) + (3 * (int)node[i].pos.yn * test.cols)] = 255;
+            cv::circle(test, cv::Point(node[i].pos.xn, node[i].pos.yn), 1, cv::Scalar(0, 0, 255), 2);
         }
 
         adj_nodes_x2.push_back(this->node[cur_i].pos.xn);
         adj_nodes_y2.push_back(this->node[cur_i].pos.yn);
         for (int i = 0; i < adj_nodes_x2.size(); i++)
         {
-            cv::circle(test, cv::Point(adj_nodes_x2[i], adj_nodes_y2[i]), 2, cv::Scalar(100, 100, 0), 1);
+            cv::circle(test, cv::Point(adj_nodes_x2[i], adj_nodes_y2[i]), 2, cv::Scalar(100, 100, 0), 2);
         }
-        
+
         cv::imshow("test", test);
         cv::imwrite("../optimization_class_ws/src/hybrid_a_star_algorithm_pkg/result.jpg", test);
         cv::waitKey(1);
         test.setTo(255);
-        usleep(10);
+        usleep(1);
         // usleep(500000);
-        
 
         // (A) 위치에서 생성한 Neighborhood Nodes들 중, 장애물을 맞닥드린 Nodes는 제거.
         // TODO: (A) 위치에서 생성한 Neighborhood Nodes들 중, 장애물을 맞닥드린 Nodes는 제거.
@@ -211,7 +222,7 @@ public:
         //     int oc_y_tmp = std::round(this->node[i].pos.yn);
         //     if (oc_x_tmp < 0) oc_x_tmp += this->negative_val_offset;
         //     if (oc_y_tmp < 0) oc_y_tmp += this->negative_val_offset;
-            
+
         //     // Red
         //     // adj_nodes_x.push_back(node[i].pos.xc);
         //     // adj_nodes_y.push_back(node[i].pos.yc);
@@ -238,17 +249,35 @@ public:
         // Call the Closed State of Nodes
         int oc_x_tmp = std::round(this->node[cur_i].pos.xn);
         int oc_y_tmp = std::round(this->node[cur_i].pos.yn);
-        if (oc_x_tmp < 0) 
+        if (oc_x_tmp < 0)
         {
-            std::cout << "Negative value for oc_x_tmp" << std::endl;   
+            std::cout << "Negative value for oc_x_tmp" << std::endl;
             oc_x_tmp += this->negative_val_offset;
         }
-        if (oc_y_tmp < 0) 
+        if (oc_y_tmp < 0)
         {
-            std::cout << "Negative value for oc_y_tmp" << std::endl;   
+            std::cout << "Negative value for oc_y_tmp" << std::endl;
             oc_y_tmp += this->negative_val_offset;
         }
 
+        // FIXME: Closed Flag 최적화
+        // (A)를 OpenNodeList에서 제거
+        // int closed_map_size_tmp = std::floor(this->length_arc)-4;
+        // int i_init = (oc_x_tmp-closed_map_size_tmp);
+        // int i_end = (oc_x_tmp+closed_map_size_tmp);
+        // int j_init = (oc_y_tmp-closed_map_size_tmp);
+        // int j_end = (oc_y_tmp+closed_map_size_tmp);
+        // std::cout << "Set Closed Region : " << i_end - i_init << "\t\t" << i_init << "\t\t" << i_end << "\t\t" << j_init << "\t\t" << j_end << "\t\t" << std::endl;
+        // if(i_init > 0 && j_init > 0)
+        // {
+        //     for(int i = i_init; i < i_end; i++)
+        //         for(int j = j_init; j < j_end; j++)
+        //            this->oc_closed_flag[i][j] = true;
+        // }
+        // else
+        //     this->oc_closed_flag[oc_x_tmp][oc_y_tmp] = true;
+
+        // FIXME: Origin
         // (A)를 OpenNodeList에서 제거
         this->oc_closed_flag[oc_x_tmp][oc_y_tmp] = true;
 
@@ -273,14 +302,13 @@ public:
         // radius.push_back(13.61); radius.push_back(6.59); radius.push_back(4.16);
         // radius.push_back(-4.16); radius.push_back(-8.96); radius.push_back(1000);
         // radius.push_back(8.96); radius.push_back(4.16);
-        
+
         // Default
         // radius.push_back(-3.20);
         // radius.push_back(-8.00);
         // radius.push_back(100000);
         // radius.push_back(8.00);
         // radius.push_back(3.20);
-        
 
         // New (Test)
         // FIXME: 생성할 Node의 개수를 골라야함.
@@ -296,16 +324,23 @@ public:
         // radius.push_back(8.00);
         // radius.push_back(3.20);
 
-            // New (Test)
+        // New (Test)
         // FIXME: 생성할 Node의 개수를 골라야함.
-        radius.push_back(-3.20);
-        radius.push_back(-8.00);
-        radius.push_back(-12.00);
+        // radius.push_back(-3.20);
+        // radius.push_back(-8.00);
+        // radius.push_back(-12.00);
+        // radius.push_back(100000);
+        // radius.push_back(12.00);
+        // radius.push_back(8.00);
+        // radius.push_back(3.20);
+        radius.push_back(-16.0);
+        radius.push_back(-40.0);
+        radius.push_back(-60.0);
         radius.push_back(100000);
-        radius.push_back(12.00);
-        radius.push_back(8.00);
-        radius.push_back(3.20);
-        double length_arc = 8; //0.97; // 1.6
+        radius.push_back(60.0);
+        radius.push_back(40.0);
+        radius.push_back(16.0);
+        // double length_arc = 1.6; //0.97; // 1.6
         double cost_g_offset = 2;
 
         //////////////////////////////
@@ -316,19 +351,50 @@ public:
         std::vector<Node> updated_node_list_tmp;
         Node init_tmp;
         init_tmp = *stand_node;
+
+        // 후진 방향 Node 증식 제거용.
+        double prev_xn_tmp = node[stand_node->parent_address].pos.xn;
+        double prev_yn_tmp = node[stand_node->parent_address].pos.yn;
+        double cur_xn_tmp = stand_node->pos.xn;
+        double cur_yn_tmp = stand_node->pos.yn;
         for (int i = 0; i < radius.size(); i++)
         {
             for (int j = 0; j < 2; j++)
             {
                 Node tmp = {};
                 tmp.pos = ReturnPOSnc({init_tmp.pos.xn, init_tmp.pos.yn, init_tmp.pos.xc, init_tmp.pos.yc}, radius[i], length_arc); // At this, pos_c mean heading.
-                updated_node_list_tmp.push_back(tmp);
 
                 // Rewnew POSc (Including Heading info)
                 init_tmp.pos.xc = tmp.pos.xc;
                 init_tmp.pos.yc = tmp.pos.yc;
+
+                // 후진 방향 Node 증식 제거용.
+                // 후진 방향 Node 증식 제거용.
+                // 후진 방향 Node 증식 제거용.
+                double new_xn_tmp = tmp.pos.xn;
+                double new_yn_tmp = tmp.pos.yn;
+                double trans_prev_xn_tmp = prev_xn_tmp - cur_xn_tmp;
+                double trans_prev_yn_tmp = prev_yn_tmp - cur_yn_tmp;
+                double trans_new_xn_tmp = new_xn_tmp - cur_xn_tmp;
+                double trans_new_yn_tmp = new_yn_tmp - cur_yn_tmp;
+                double A_tmp = EuclideanDistance(trans_new_xn_tmp, trans_new_yn_tmp);
+                double B_tmp = EuclideanDistance(trans_prev_xn_tmp, trans_prev_yn_tmp);
+                double den_tmp = A_tmp * B_tmp;
+                double cos_theta = (trans_prev_xn_tmp * trans_new_xn_tmp + trans_prev_yn_tmp * trans_new_yn_tmp) / den_tmp;
+                double angle_deg = std::acos(cos_theta) * 180. / M_PI; // 얘는 안씀. cos_theta가 1.00001 혹은 -1.00001 값이 나오면 std::acos가 nan으로 발산하는 값을 리턴함.
+                if (den_tmp == 0)
+                {
+                    updated_node_list_tmp.push_back(tmp);
+                }
+                else
+                {
+                    // if(angle_deg > 90)
+                    if (cos_theta < 0) // angle_deg가 90도보다 큰 애들 (전진쪽 노드)만 넣어준다는 의미. angle_deg를 안쓴 이유는 std::acos(-1.00001) 값이 나오면 nan을 리턴함.
+                        updated_node_list_tmp.push_back(tmp);
+                }
             }
         }
+        // std::cout << updated_node_list_tmp.size() << "\t\t" << updated_node_list_tmp.size() << "\t\t" << updated_node_list_tmp.size() << "\t\t" << updated_node_list_tmp.size() << "\t\t" << updated_node_list_tmp.size() << "\t\t" << std::endl;
 
         ////////////////////////////////
         /// Set Node Cost and Parent ///
@@ -343,7 +409,7 @@ public:
         //     // updated_node_list_tmp[i].close_flag = false;
         // }
 
-        // With Potential Field        
+        // With Potential Field
         for (int i = 0; i < updated_node_list_tmp.size(); i++)
         {
             double U_att = 0; // attractive potential
@@ -352,41 +418,73 @@ public:
             double ego_x_tmp = updated_node_list_tmp[i].pos.xn;
             double ego_y_tmp = updated_node_list_tmp[i].pos.yn;
 
-            // 경사 생성
-            // U_att += -PotentialExp(ego_x_tmp, ego_y_tmp)/10.;
-            // WPs 넣기 (0,0), (1,1) ..., (99,99) 의 WPs (총 100개)가 있다고 가정하고 테스트.
-            // for(int i = 10; i < 200; i++)
-            // {
-            //     // U_att += PotentialExp(ego_x_tmp-i, ego_y_tmp-i)*i;
-            //     U_att += PotentialDistance(ego_x_tmp-i, ego_y_tmp-i)*i/100000.;
-            //     // std::cout << U_att << "\t\t" << ego_x_tmp << "\t\t" << ego_y_tmp << std::endl;
-            // }
-            
-            U_att += EuclideanDistance(ego_x_tmp-25, ego_y_tmp-100)*EuclideanDistance(25, 100)/1000.;
-            U_att += EuclideanDistance(ego_x_tmp-50, ego_y_tmp-200)*EuclideanDistance(50, 200)/1000.;
-            
-            // U_total = U_rep - U_att;
 
-            // updated_node_list_tmp[i].cost.g = stand_node->cost.g + length_arc / cost_g_offset; // FIXME: /cost_g_offset 개념 알아두기.
-            // updated_node_list_tmp[i].cost.h = std::sqrt(pow(updated_node_list_tmp[i].pos.xn - this->target_x, 2) + std::pow(updated_node_list_tmp[i].pos.yn - this->target_y, 2));
-            updated_node_list_tmp[i].cost.h = U_att;// + stand_node->cost.h;
+            std::vector<double> WPs_x_tmp;
+            WPs_x_tmp.push_back(50);
+            WPs_x_tmp.push_back(100);
+            WPs_x_tmp.push_back(150);
+            WPs_x_tmp.push_back(200);
+            WPs_x_tmp.push_back(250);
+            WPs_x_tmp.push_back(300);
+            // WPs_x_tmp.push_back(50);
+            // WPs_x_tmp.push_back(100);
+            // WPs_x_tmp.push_back(75);
+            // WPs_x_tmp.push_back(50);
+            // WPs_x_tmp.push_back(25);
+            // WPs_x_tmp.push_back(50);
+
+
+
+            std::vector<double> WPs_y_tmp;
+            WPs_y_tmp.push_back(50);
+            WPs_y_tmp.push_back(100);
+            WPs_y_tmp.push_back(75);
+            WPs_y_tmp.push_back(50);
+            WPs_y_tmp.push_back(25);
+            WPs_y_tmp.push_back(50);
+            // WPs_y_tmp.push_back(50);
+            // WPs_y_tmp.push_back(100);
+            // WPs_y_tmp.push_back(150);
+            // WPs_y_tmp.push_back(200);
+            // WPs_y_tmp.push_back(250);
+            // WPs_y_tmp.push_back(300);
+
+            
+            // WP_x_tmp << 50, 100, 50, 100, 100;
+            Eigen::Map<Eigen::VectorXd> x_tmp(&WPs_x_tmp[0], WPs_x_tmp.size());
+            Eigen::Map<Eigen::VectorXd> y_tmp(&WPs_y_tmp[0], WPs_y_tmp.size());
+            Eigen::VectorXd coeffs_tmp = PolyFit(x_tmp, y_tmp, 3);
+
+            // WPs Potential
+            U_att = GetPotentialCost(coeffs_tmp, ego_x_tmp, ego_y_tmp);
+
+            // Obstacle Potential
+            U_rep = PotentialExp(ego_x_tmp - 180, ego_y_tmp - 65) * 100000;
+
+            // Total Potential Function Value
+            U_total = U_rep + U_att;
+            
+
+            // FIXME: cost.g 추가 여부 판단하기.
+            // FIXME: cost.g 추가 여부 판단하기.
+            // FIXME: cost.g 추가 여부 판단하기.
+            updated_node_list_tmp[i].cost.g = stand_node->cost.g + length_arc / cost_g_offset; // FIXME: /cost_g_offset 개념 알아두기.
+            updated_node_list_tmp[i].cost.h = U_total;
             updated_node_list_tmp[i].cost.f = updated_node_list_tmp[i].cost.g + updated_node_list_tmp[i].cost.h;
-            std::cout << updated_node_list_tmp[i].cost.g << "\t\t" << updated_node_list_tmp[i].cost.h << "\t\t[" << updated_node_list_tmp[i].cost.f << "]\t\t" << U_rep << "\t\t[" << U_att << std::endl;
+
             updated_node_list_tmp[i].cur_address = this->node.size() + i;
             updated_node_list_tmp[i].parent_address = stand_node->cur_address;
-            // updated_node_list_tmp[i].close_flag = false;
         }
-
 
         return updated_node_list_tmp;
     }
     double EuclideanDistance(double x_, double y_)
     {
-        return std::sqrt(x_*x_ + y_*y_);
+        return std::sqrt(x_ * x_ + y_ * y_);
     }
     double PotentialExp(double x_, double y_)
     {
-        return std::exp(-std::sqrt(x_*x_ + y_*y_));
+        return std::exp(-std::sqrt(x_ * x_ + y_ * y_));
     }
 
     Node::Pos ReturnPOSnc(Node::Pos pos_, double radius_, double length_arc_)
@@ -422,6 +520,40 @@ public:
 
             ReturnPath(&this->node[arrival_node_->parent_address]);
         }
+    }
+
+    Eigen::VectorXd PolyFit(Eigen::VectorXd xvals, Eigen::VectorXd yvals, int order)
+    {
+        Eigen::MatrixXd A(xvals.size(), order + 1);
+
+        for (int i = 0; i < xvals.size(); i++)
+            A(i, 0) = 1.0;
+
+        for (int j = 0; j < xvals.size(); j++)
+            for (int i = 0; i < order; i++)
+                A(j, i + 1) = A(j, i) * xvals(j);
+
+        auto Q = A.householderQr();
+        auto result = Q.solve(yvals);
+
+        return result;
+    }
+
+    double GetPotentialCost(Eigen::VectorXd coeffs_, double x_, double y_)
+    {
+        double WPsEval_tmp = std::pow(PolyEval(coeffs_, x_) - y_, 2);
+        double GradientEval_tmp = - std::sqrt(x_*x_+y_*y_);
+        double Offset_tmp = 5;
+        double tmp = WPsEval_tmp + GradientEval_tmp + Offset_tmp;
+        return tmp;
+    }
+    double PolyEval(Eigen::VectorXd coeffs, double x)
+    {
+        double result = 0.0;
+        for (int i = 0; i < coeffs.size(); i++)
+            result += coeffs[i] * pow(x, i);
+
+        return result;
     }
 
 protected:

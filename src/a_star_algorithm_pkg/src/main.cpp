@@ -13,48 +13,6 @@
 
 int main(int argc, char **argv)
 {
-    // FIXME: have to delete
-    // FIXME: have to delete
-    // FIXME: have to delete
-    // FIXME: have to delete
-    // FIXME: have to delete
-//    double wb = 2.75;                       // unit : m     휠베이스
-//    double steer_angle_tmp = 450;           // unit : deg   스티어링 각도
-//    double d_mv = 5;                        // unit : m     예측할 이동거리
-
-//    // d_mv <= 2 Unit Grid. Unit Grid -> 0.1m
-
-//    // 스티어링 변화에 따라, 회전하는 방향으로 검출ROI의 영역을 더 늘리기 위한 offset임.
-//    double steer_rot_offset = steer_angle_tmp / 25.;
-
-//    // 차량 외곽 크기를 기준으로 y축에 offset 0.4씩 넣어준 것 (그래서 0.7, -0.7이 된 것.)
-//    double ref_x[4] = {2.1, 2.1, -2.1, -2.1};
-//    double ref_y[4] = {0.7, -0.7, -1.1, 1.1};
-//    double l = 0;     // bycycle model 에서 회전중심과 뒷바퀴와의 거리
-//    double theta = 0; // bycycle modle의 회전중심을 기준으로 d_mv만큼 호를 그리며 이동할 때, 이동한 거리에 따른 각도
-
-//    double pred_x[4] = {}; // 결과
-//    double pred_y[4] = {}; // 결과
-
-//    // l, theta 계산
-//    l = wb / std::tan(steer_angle_tmp / 180. * M_PI);
-//    theta = d_mv / l * M_PI / 180.;
-
-//    // Rotation and Translation
-//    for (int i = 0; i < 4; i++)
-//    {
-//        pred_x[i] = std::cos(theta * 180 / M_PI) * ref_x[i] - std::sin(theta * 180 / M_PI) * (ref_y[i] - l);
-//        pred_y[i] = std::sin(theta * 180 / M_PI) * ref_x[i] + std::cos(theta * 180 / M_PI) * (ref_y[i] - l) + l;
-//    }
-
-
-    // Input : Steer Angle, Yaw Angle
-    // Output : Predicted PosXY
-    double yaw_angle = 10; // Const
-    double wb = 4.8;
-    double steer_angle_rag = 5 * M_PI / 180.;
-    double radius = wb*std::sqrt(1/std::pow(steer_angle_rag, 2) - 1./4.);
-
 
     ///////////////////////////////
     ///////////////////////////////
@@ -106,7 +64,8 @@ int main(int argc, char **argv)
     ////////////////////////////////////
     // Get Input Img from jpeg
     cv::Mat obstacle_img;
-    obstacle_img = cv::imread("../optimization_class_ws/img/" + img_count + ".jpeg");
+    obstacle_img = cv::imread("img/" + img_count + ".jpeg");
+    // obstacle_img = cv::imread("img/" + img_count + ".png");
     if(!obstacle_img.data)
     {
         std::cout << "Can't find the image file" << std::endl;
@@ -133,24 +92,74 @@ int main(int argc, char **argv)
     // Set Astar
     Astar astar(occupancy_grid_map_width, occupancy_grid_map_height, init_pos_x, init_pos_y);
 
-    // Set Obstacle in Occupancy Grid Map of Astar
+    std::vector<std::pair<double, double>> waypoints;
+    double prev_x_tmp = 0;
     for(int i = 0; i < obstacle_img.cols; i++)
         for(int j = 0; j < obstacle_img.rows; j++)
         {
-            // Obstacle_value 값이 255*3보다 작으면, 장애물의 위치를 의미
-            int obstacle_value =
-                                obstacle_img.data[(i * 3 + 0) + (3 * j * obstacle_img.cols)] +
-                                obstacle_img.data[(i * 3 + 1) + (3 * j * obstacle_img.cols)] +
-                                obstacle_img.data[(i * 3 + 2) + (3 * j * obstacle_img.cols)];
-
-            // Set Obstacle
-            if (obstacle_value < 255*3)
+            double r_tmp = obstacle_img.at<cv::Vec3b>(j, i)[2];
+            double g_tmp = obstacle_img.at<cv::Vec3b>(j, i)[1];
+            double b_tmp = obstacle_img.at<cv::Vec3b>(j, i)[0];
+            if((r_tmp + g_tmp + b_tmp) <= 20)
             {
-                int x_tmp = i;
-                int y_tmp = j;
-                astar.node[x_tmp + (y_tmp * occupancy_grid_map_width)].close_flag = true;
+                if(i >= 163)
+                {
+                    if(i - prev_x_tmp > 5)
+                    {
+                        // std::cout << obstacle_img.at<cv::Vec3b>(j, i) << "\t\t" << i << "\t\t" << j << std::endl;
+                        waypoints.push_back(std::make_pair(i, j));
+                        // cv::circle(result, cv::Point(i, j), 0, cv::Scalar(0,0,255), 2);
+                    }
+                    prev_x_tmp = i;
+                }
             }
         }
+
+    // std::vector<std::pair<double, double>> obstacles;
+    for(int i = 0; i < obstacle_img.cols; i++)
+        for(int j = 0; j < obstacle_img.rows; j++)
+        {
+            double r_tmp = obstacle_img.at<cv::Vec3b>(j, i)[2];
+            double g_tmp = obstacle_img.at<cv::Vec3b>(j, i)[1];
+            double b_tmp = obstacle_img.at<cv::Vec3b>(j, i)[0];
+            // if((r_tmp + g_tmp + b_tmp) < 700 & (r_tmp + g_tmp + b_tmp) > 500)
+            // if(((r_tmp + g_tmp + b_tmp) >= 400) & ((r_tmp + g_tmp + b_tmp) < 700))
+            if( b_tmp > 215 & (r_tmp + g_tmp + b_tmp < 590))
+            {
+                std::cout << obstacle_img.at<cv::Vec3b>(j, i) << "\t\t" << i << "\t\t" << j << std::endl;
+                // obstacles.push_back(std::make_pair(i, j));
+                // cv::circle(result, cv::Point(i, j), 0, cv::Scalar(0,255,0), 5);
+                // astar.node[i + (j * occupancy_grid_map_width)].close_flag = true;
+
+                for(int l = -15; l < 15; l++)
+                    for(int m = -15; m<15; m++)
+                    {
+                        // cv::circle(result, cv::Point(i+l, j+m), 0, cv::Scalar(0,255,0), 5);
+                        astar.node[i+l + ((j+m) * occupancy_grid_map_width)].close_flag = true;
+                        // obstacles.push_back(std::make_pair(i, j));
+                    }
+            }
+        }
+
+
+    // Set Obstacle in Occupancy Grid Map of Astar
+    // for(int i = 0; i < obstacle_img.cols; i++)
+    //     for(int j = 0; j < obstacle_img.rows; j++)
+    //     {
+    //         // Obstacle_value 값이 255*3보다 작으면, 장애물의 위치를 의미
+    //         int obstacle_value =
+    //                             obstacle_img.data[(i * 3 + 0) + (3 * j * obstacle_img.cols)] +
+    //                             obstacle_img.data[(i * 3 + 1) + (3 * j * obstacle_img.cols)] +
+    //                             obstacle_img.data[(i * 3 + 2) + (3 * j * obstacle_img.cols)];
+
+    //         // Set Obstacle
+    //         if (obstacle_value < 255*3)
+    //         {
+    //             int x_tmp = i;
+    //             int y_tmp = j;
+    //             astar.node[x_tmp + (y_tmp * occupancy_grid_map_width)].close_flag = true;
+    //         }
+    //     }
 
     // Clipping for init and final pos for existing obstacle
     if(astar.node[init_pos_x + (init_pos_y * occupancy_grid_map_width)].close_flag == true |
@@ -177,7 +186,7 @@ int main(int argc, char **argv)
     ///////////////////////////
     ///////////////////////////
     ///////////////////////////
-
+/*
     for(int i = 0; i < adj_nodes_x.size(); i++)
     {
         int color_tmp = i % 255;
@@ -185,9 +194,14 @@ int main(int argc, char **argv)
 //        cv::imshow("Result of Astar", result);
 //        cv::waitKey();
     }
+*/
 
-    for(int i = 0; i < astar.local_x.size(); i++)
-        cv::circle(result, cv::Point(astar.local_x[i], astar.local_y[i]), 0, cv::Scalar(255,0,0), 1);
+    
+    for(int i = 0; i < astar.local_x.size()-1; i++)
+    {
+        // cv::circle(result, cv::Point(astar.local_x[i], astar.local_y[i]), 0, cv::Scalar(0,0,255), 1);
+        cv::line(result, cv::Point(astar.local_x[i], astar.local_y[i]), cv::Point(astar.local_x[i+1], astar.local_y[i+1]), cv::Scalar(0,0,255), 1, 8, 0);
+    }
 
     // Occupancy Grid Map Coordinate -> OpenCV Coordinate
     // OpenCV와 Astar의 Occuapncy Grid Map의 좌표계가 다르기 때문에 상하반전 작업
@@ -198,7 +212,8 @@ int main(int argc, char **argv)
 
 //    cv::imshow("Input Obstacle Img", obstacle_img);
     cv::imshow("Result of Astar", result);
-
+    cv::imwrite("img/result/result.jpeg", result);
+    
     // If push 'q', exit the progmram
     while(cv::waitKey(10)!='q')
     {

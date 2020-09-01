@@ -9,6 +9,7 @@
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 
+#include "monitor.h"
 
 
 int main(int argc, char **argv)
@@ -18,42 +19,27 @@ int main(int argc, char **argv)
     ///////////////////////////////
     ///////////////////////////////
     ///////////////////////////////
-    if(argc!=6)
+    if(argc!=2)
     {
         std::cout << "The command should be comply with this format." << std::endl;
-        std::cout << "Format : [img_num] [init_x] [init_y] [target_x] [target_y]" << std::endl;
-        std::cout << "Ex : rosrun a_star_algorithm_pkg a_star_algorithm_pkg_exe [img_num] [init_x] [init_y] [final_x] [final_y]" << std::endl;
+        std::cout << "Format : rosrun [pkg] [img_num]" << std::endl;
         exit(1);
     }
+    
 
     ////////////////////////
     //////// Praram ////////
     ////////////////////////
-    // Set Input Image Name (1~7)
+    // Set Input Image Name
     std::string img_count = argv[1];
 
-    // Set Size of Obstacle Image
+    // // Set Size of Obstacle Image
     int obstacle_img_width = 960;
     int obstacle_img_height = 540;
 
-    // Set Size of Occupancy Grid Map, Astar
+    // // Set Size of Occupancy Grid Map, Astar
     int occupancy_grid_map_width = 959;
     int occupancy_grid_map_height = 538;
-
-    // Set Departure Pos_xy
-    int init_pos_x = std::stoi(argv[2]) + 1;
-    int init_pos_y = obstacle_img_height - 1 - std::stoi(argv[3]);
-
-    // Set Arrival Pos_xy
-    int target_x = std::stoi(argv[4]) + 1;
-    int target_y = obstacle_img_height - 1 - std::stoi(argv[5]);
-
-    // Clipping for input pos_xy
-    if(init_pos_x < 3 | init_pos_y < 3 | target_x > 958 | target_y > 540)
-    {
-        std::cout << "The pos should be larget than (3, 3) and smaller than (958, 540)" << std::endl;
-        exit(1);
-    }
 
     ////////////////////////////////////
     ////////////////////////////////////
@@ -82,16 +68,6 @@ int main(int argc, char **argv)
     result = obstacle_img.clone();
 
 
-    ///////////////////////
-    ///////////////////////
-    ///////////////////////
-    //////// Astar ////////
-    ///////////////////////
-    ///////////////////////
-    ///////////////////////
-    // Set Astar
-    Astar astar(occupancy_grid_map_width, occupancy_grid_map_height, init_pos_x, init_pos_y);
-
     std::vector<std::pair<double, double>> waypoints;
     double prev_x_tmp = 0;
     for(int i = 0; i < obstacle_img.cols; i++)
@@ -114,6 +90,24 @@ int main(int argc, char **argv)
                 }
             }
         }
+
+    int init_pos_x = waypoints[0].first;
+    int init_pos_y = waypoints[0].second;
+    int target_x = waypoints[waypoints.size()-5].first;
+    int target_y = waypoints[waypoints.size()-5].second;
+
+    ///////////////////////
+    ///////////////////////
+    ///////////////////////
+    //////// Astar ////////
+    ///////////////////////
+    ///////////////////////
+    ///////////////////////
+    TimeChecker tc[5];
+    tc[0].DeparturePointTime();
+
+    // Set Astar
+    Astar astar(occupancy_grid_map_width, occupancy_grid_map_height, init_pos_x, init_pos_y);
 
     // std::vector<std::pair<double, double>> obstacles;
     for(int i = 0; i < obstacle_img.cols; i++)
@@ -176,7 +170,7 @@ int main(int argc, char **argv)
     while(!astar.GetResult(target_x,target_y))
     {
     }
-
+    std::cout << "Loop Time : " << tc[0].ArrivalPointTime() << std::endl;
 
 
     ///////////////////////////

@@ -18,17 +18,10 @@
 	
 		2. source devel/setup.bash
 
-		3. rosrun a_star_algorithm_pkg a_star_algorithm_pkg [img_num] [init_x] [init_y] [final_x] [final_y]
+		3. rosrun a_star_algorithm_pkg a_star_algorithm_pkg [img_num]
 
-		   ex. rosrun a_star_algorithm_pkg a_star_algorithm_pkg 5 1 1 920 500
+		   ex. rosrun a_star_algorithm_pkg a_star_algorithm_pkg 5
 
-		- 명령어 변수 설명
-
-			1. img_num은 실행할 Obstacle Images로 1~7의 숫자 입력 가능
-
-			2. init_xy는 시작 위치 (x는 3~937, y는 3~539)
-
-			3. final_xy는 목표 위치 (x는 3~937, y는 3~539)
 
 
 
@@ -41,10 +34,14 @@
 
 		2. source devel/setup.bash
 
-		3. rosrun hybrid_a_star_algorithm_pkg hybrid_a_star_algorithm_pkg_exe
+		3. rosrun hybrid_a_star_algorithm_pkg hybrid_a_star_algorithm_pkg_exe [img_num]
+
+		   ex. rosrun hybrid_a_star_algorithm_pkg hybrid_a_star_algorithm_pkg_exe 5
 
 
+		- 명령어 변수 설명
 
+			1. img_num은 실행할 Obstacle Images로 1~7의 숫자 입력 가능
 
  -----------------------------------------------------
 

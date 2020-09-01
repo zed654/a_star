@@ -40,6 +40,7 @@ link_libraries(${OpenCV_LIBS})
 
 add_executable(a_star_algorithm_pkg_exe
 	src/main.cpp
+	src/monitor.cpp
         include/astar.hpp
 )
 

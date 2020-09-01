@@ -10,7 +10,7 @@
 #include <opencv2/highgui.hpp>
 
 #include "hybrid_astar.hpp"
-
+#include "monitor.h"
 
 class m_vector2d
 {
@@ -26,13 +26,21 @@ struct path_color
 
 Eigen::VectorXd PolyFit(Eigen::VectorXd xvals, Eigen::VectorXd yvals, int order);
 
-int main()
+int main(int argc, char **argv)
 {
+    if(argc!=2)
+    {
+        std::cout << "The command should be comply with this format." << std::endl;
+        std::cout << "Format : rosrun [pkg] [img_num]" << std::endl;
+        exit(1);
+    }
+    std::string img_count = argv[1];
+
     cv::Mat obstacle_img;
     // Set Size of Obstacle Image
     int obstacle_img_width = 960;
     int obstacle_img_height = 540;
-    obstacle_img = cv::imread("img/12.jpeg");
+    obstacle_img = cv::imread("img/" + img_count + ".jpeg");
     if(!obstacle_img.data)
     {
         std::cout << "Can't find the image file" << std::endl;
@@ -65,7 +73,7 @@ int main()
                 {
                     if(i - prev_x_tmp > 5)
                     {
-                        std::cout << obstacle_img.at<cv::Vec3b>(j, i) << "\t\t" << i << "\t\t" << j << std::endl;
+                        // std::cout << obstacle_img.at<cv::Vec3b>(j, i) << "\t\t" << i << "\t\t" << j << std::endl;
                         waypoints.push_back(std::make_pair(i+1000, j+1000));
                         // cv::circle(result, cv::Point(i, j), 0, cv::Scalar(0,0,255), 5);
                     }
@@ -85,12 +93,13 @@ int main()
             double b_tmp = obstacle_img.at<cv::Vec3b>(j, i)[0];
             // if((r_tmp + g_tmp + b_tmp) < 700 & (r_tmp + g_tmp + b_tmp) > 500)
             // if(((r_tmp + g_tmp + b_tmp) >= 400) & ((r_tmp + g_tmp + b_tmp) < 700))
-            if( b_tmp > 215 & (r_tmp + g_tmp + b_tmp < 590))
-            {
-                obstacles_tmp.push_back(std::make_pair(i+1000, j+1000));
-                std::cout << obstacle_img.at<cv::Vec3b>(j, i) << "\t\t" << i << "\t\t" << j << std::endl;
-                // cv::circle(result, cv::Point(i, j), 0, cv::Scalar(0,255,0), 5);
-            }
+            if((i+j)%23 == 0)
+                if( b_tmp > 215 & (r_tmp + g_tmp + b_tmp < 590))
+                {
+                    obstacles_tmp.push_back(std::make_pair(i+1000, j+1000));
+                    // std::cout << obstacle_img.at<cv::Vec3b>(j, i) << "\t\t" << i << "\t\t" << j << std::endl;
+                    // cv::circle(result, cv::Point(i, j), 0, cv::Scalar(0,255,0), 1);
+                }
         }
 
 
@@ -107,16 +116,29 @@ int main()
     Eigen::Map<Eigen::VectorXd> y_tmp(&WPs_y_tmp2[0], WPs_y_tmp2.size());
     Eigen::VectorXd coeffs_tmp2 = PolyFit(x_tmp, y_tmp, 3);
 
-    double target_x_tmp2 = 1700;
-    double target_y_tmp2 = 1330;
-    HybridAstar h_astar2(1163, 1255, target_x_tmp2 + 1000, target_y_tmp2 + 1000);
+    // double target_x_tmp2 = 1700;
+    // double target_y_tmp2 = 1330;
+
+    int init_x_tmp = waypoints[0].first;
+    int init_y_tmp = waypoints[0].second;
+    double target_x_tmp2 = waypoints[waypoints.size()-1].first;
+    double target_y_tmp2 = waypoints[waypoints.size()-1].second;
+    TimeChecker tc[5];
+    tc[0].DeparturePointTime();
+    // HybridAstar h_astar2(1163, 1255, target_x_tmp2 + 1000, target_y_tmp2 + 1000);
+    HybridAstar h_astar2(init_x_tmp, init_y_tmp, target_x_tmp2, target_y_tmp2);
     // int alive_count_tmp = 0;
+    int nCount_tmp = 0;
+    std::cout << obstacles_tmp.size() << std::endl;
     while (!h_astar2.Run(coeffs_tmp2, obstacles_tmp))
     {
-        usleep(10);
+        std::cout << "Loop Time : " << tc[1].LoopTimeCalc() << "\t\t" << nCount_tmp++ << std::endl;
+        // usleep(10);
         // std::cout << alive_count_tmp++ << std::endl;
     }
-
+    std::cout << "nObstacle : " << obstacles_tmp.size() << std::endl;
+    std::cout << "Total Loop Time : " << tc[0].ArrivalPointTime() << " ms" << std::endl;
+    
     std::vector<std::pair<double, double>> local_xy_tmp;
     for (int i = 0; i < h_astar2.local_x.size(); i++)
     {
@@ -126,7 +148,7 @@ int main()
 
     for(int i = 0; i < local_xy_tmp.size()-1; i++)
     {
-        std::cout << local_xy_tmp[i].first << "\t\t" << local_xy_tmp[i].second << std::endl;
+        // std::cout << local_xy_tmp[i].first << "\t\t" << local_xy_tmp[i].second << std::endl;
         // cv::circle(result, cv::Point(local_xy_tmp[i].first, local_xy_tmp[i].second), 1, cv::Scalar(0,0,255), 4);
         cv::line(result, cv::Point(local_xy_tmp[i].first, local_xy_tmp[i].second), cv::Point(local_xy_tmp[i+1].first, local_xy_tmp[i+1].second), cv::Scalar(0, 0, 255), 1, 8, 0);
     }
@@ -151,16 +173,9 @@ int main()
     cv::imshow("Result of Astar", result);
     cv::imwrite("img/result/result2.jpeg", result);
 
-    cv::waitKey(10);
-
-
-
-
-
-
-    while(1)
+    while(cv::waitKey(10)!='q')
     {
-        sleep(1);
+
     }
 }
 

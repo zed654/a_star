@@ -43,6 +43,16 @@
 
 			1. img_num은 실행할 Obstacle Images로 1~7의 숫자 입력 가능
 
+
+
+
+	3. Genetic Algorithm
+
+	아직 Path Planning으로 구현하지 않음.
+
+	테스트 코드 rosrun genetic_algorithm_pkg genetic_algorithm_pkg_exe
+
+
  -----------------------------------------------------
 
  - Version

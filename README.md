@@ -48,9 +48,9 @@
 
 	3. Genetic Algorithm
 
-	아직 Path Planning으로 구현하지 않음.
+		아직 Path Planning으로 구현하지 않음.
 
-	테스트 코드 rosrun genetic_algorithm_pkg genetic_algorithm_pkg_exe
+		테스트 코드 rosrun genetic_algorithm_pkg genetic_algorithm_pkg_exe
 
 
  -----------------------------------------------------
